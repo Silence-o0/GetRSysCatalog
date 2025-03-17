@@ -1,5 +1,4 @@
 #include <iostream>
-#include <vector>
 #include <list>
 #include <string>
 #include <algorithm>
@@ -44,14 +43,14 @@ class RelationType {
 public:
     string name;
     int rowSize;
-    vector<Attribute> attributes;
+    list<Attribute> attributes;
 
-    RelationType(string n) : name(n), rowSize(0) {}
+    RelationType(string n) : name(move(n)), rowSize(0) {}
 
     void addAttribute(const Attribute& attr) {
         attributes.push_back(attr);
         rowSize += attr.size;
-        sort(attributes.begin(), attributes.end(), compareAttributes);
+        attributes.sort(compareAttributes);
     }
 };
 
@@ -59,7 +58,7 @@ class Table {
 public:
     string name;
     string storageFile;
-    vector<pair<string, int>> attributeInfo;
+    list<pair<string, int>> attributeInfo;
 
     Table(string n, string file)
             : name(move(n)), storageFile(move(file)) {}
@@ -81,7 +80,7 @@ public:
     }
 };
 
-void LOADT(const string& filename, const vector<TableList*>& tableLists) {
+void LOADT(const string& filename, const list<TableList*>& tableLists) {
     ofstream outFile(filename, ios::binary);
     if (!outFile) {
         cerr << "Unable to open file!" << endl;
@@ -97,7 +96,6 @@ void LOADT(const string& filename, const vector<TableList*>& tableLists) {
         size_t typeNameLength = tableList->type->name.size();
         outFile.write(reinterpret_cast<const char*>(&typeNameLength), sizeof(typeNameLength));
         outFile.write(tableList->type->name.data(), typeNameLength);
-
 
         size_t numAttributes = tableList->type->attributes.size();
         outFile.write(reinterpret_cast<const char*>(&numAttributes), sizeof(numAttributes));
@@ -142,14 +140,14 @@ void LOADT(const string& filename, const vector<TableList*>& tableLists) {
     outFile.close();
 }
 
-vector<TableList*> RECOVERYT(const string& filename) {
+list<TableList*> RECOVERYT(const string& filename) {
     ifstream inFile(filename, ios::binary);
     if (!inFile) {
         cerr << "Unable to open file!" << endl;
         return {};
     }
 
-    vector<TableList*> tableLists;
+    list<TableList*> tableLists;
 
     size_t numTypes;
     inFile.read(reinterpret_cast<char*>(&numTypes), sizeof(numTypes));
@@ -230,7 +228,7 @@ vector<TableList*> RECOVERYT(const string& filename) {
     return tableLists;
 }
 
-void GetR(const string& relationName, const vector<TableList*>& tableLists) {
+void GetR(const string& relationName, const list<TableList*>& tableLists) {
     for (const auto& tableList : tableLists) {
         for (const auto& table : tableList->tables) {
             if (table.name == relationName) {
@@ -243,7 +241,7 @@ void GetR(const string& relationName, const vector<TableList*>& tableLists) {
                 for (const auto& attrInfo : table.attributeInfo) {
                     int attrId = attrInfo.second;
                     auto it = find_if(attributes.begin(), attributes.end(),
-                                           [attrId](const Attribute& attr) { return attr.id == attrId; });
+                                      [attrId](const Attribute& attr) { return attr.id == attrId; });
                     if (it != attributes.end()) {
                         const auto& attr = *it;
                         cout << "    Name: " << attrInfo.first
@@ -261,8 +259,6 @@ void GetR(const string& relationName, const vector<TableList*>& tableLists) {
     }
     cout << "Relation with name " << relationName << " not found." << endl;
 }
-
-
 
 int main() {
     RelationType type1("Type1");
@@ -304,24 +300,23 @@ int main() {
     Table table4("PizzaNew", "pizza_new.bin");
     table4.addAttributeInfo("id", 1);
     table4.addAttributeInfo("order_id", 2);
-//    table4.addAttributeInfo("sauce", 3);
     table4.addAttributeInfo("price", 4);
 
     TableList tableList3(&type3);
     tableList3.addTable(table3);
     tableList3.addTable(table4);
 
-    vector<TableList*> tableLists = {&tableList1, &tableList2, &tableList3};
+    list<TableList*> tableLists = {&tableList1, &tableList2, &tableList3};
     LOADT("Tdescr.bin", tableLists);
 
-    vector<TableList*> recoveredTableLists = RECOVERYT("Tdescr.bin");
+    list<TableList*> recoveredTableLists = RECOVERYT("Tdescr.bin");
 
     cout << "___________Info from Tdescr___________" << endl;
-    for (size_t i = 0; i < recoveredTableLists.size(); ++i) {
-        cout << "RelationType " << recoveredTableLists[i]->type->name << ":" << endl;
+    for (const auto& tableList : recoveredTableLists) {
+        cout << "RelationType " << tableList->type->name << ":" << endl;
 
         cout << "  Attributes:" << endl;
-        for (const auto& attr : recoveredTableLists[i]->type->attributes) {
+        for (const auto& attr : tableList->type->attributes) {
             cout << "    ID: " << attr.id
                  << ", Name: " << attr.name
                  << ", Type: " << static_cast<int>(attr.type)
@@ -331,7 +326,7 @@ int main() {
                  << endl;
         }
 
-        for (const auto& table : recoveredTableLists[i]->tables) {
+        for (const auto& table : tableList->tables) {
             cout << "  Table Name: " << table.name << ", Storage File: " << table.storageFile << endl;
             for (const auto& attrInfo : table.attributeInfo) {
                 cout << "    Attribute: " << attrInfo.first << ", ID: " << attrInfo.second << endl;
